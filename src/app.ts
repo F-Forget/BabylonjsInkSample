@@ -12,6 +12,7 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { createSimpleMaterial } from "./materials/simpleMaterial";
 
 import { InkCanvas } from "./inkCanvas";
+import { Mesh, StandardMaterial } from "@babylonjs/core";
 
 // Find our elements
 const mainCanvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -52,40 +53,15 @@ function createScene(engine) {
     // Ensures default is part of our supported use cases.
     scene.defaultMaterial = createSimpleMaterial("default", scene, Color3.White());
 
-    // A nice and fancy background color
-    const clearColor = new Color4(77 / 255, 86 / 255, 92 / 255, 1);
-    scene.clearColor = clearColor;
-
     // Add a camera to the scene
-    const camera = new FreeCamera("orthoCamera", new Vector3(0, 0, -3), scene);
-
-    setupCamera(camera, engine.getRenderWidth(), engine.getRenderHeight());
+    const camera = new FreeCamera("orthoCamera", new Vector3(0, 0, -6), scene);
 
     // Rely on the underlying engine render loop to update the filter result every frame.
     engine.runRenderLoop(() => {
         scene.render();
     });
 
-    // OnResize
-    engine.onResizeObservable.add(() => {
-        setupCamera(camera, engine.getRenderWidth(), engine.getRenderHeight());
-    });
-
     return scene;
-}
-
-function setupCamera(camera: Camera, width: number, height: number): void {
-    // We chose an orthographic view to simplify at most our mesh creation
-    camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
-
-    // Setup the camera to fit with our gl coordinates in the canvas
-    camera.unfreezeProjectionMatrix();
-    camera.orthoTop = 0;
-    camera.orthoLeft = 0;
-    camera.orthoBottom = height;
-    camera.orthoRight = width;
-    camera.getProjectionMatrix(true);
-    camera.freezeProjectionMatrix();
 }
 
 const engine = createEngine();

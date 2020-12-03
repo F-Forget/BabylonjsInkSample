@@ -15,6 +15,8 @@ import { createDebugMaterial } from "./materials/debugMaterial";
 import { createSimpleMaterial } from "./materials/simpleMaterial";
 import { createRainbowMaterial, getColorAtToRef } from "./materials/rainbowMaterial";
 
+import { Mesh, StandardMaterial } from "@babylonjs/core";
+
 /**
  * Various brush modes
  */
@@ -41,6 +43,7 @@ export class InkCanvas {
     private _currentSize: number;
     private _currentColor: Color3;
     private _currentMode: Brush;
+    private _drawingPlane: Mesh;
 
     /**
      * Creates an instance of an ink canvas associated to a html canvas element
@@ -53,13 +56,24 @@ export class InkCanvas {
         this._paths = [];
         this._redoPaths = [];
         this._currentPath = null;
-        this._currentSize = 5;
+        this._currentSize = 0.05;
         this._currentColor = Color3.White();
         this._currentMode = Brush.pen;
 
 
+
         this._scene = scene;
         this._pointerNode = new Vector3(0, 0, 0);
+
+        //Materials
+        const greyMat = new StandardMaterial("white", scene);
+        greyMat.diffuseColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+        greyMat.emissiveColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+        greyMat.specularColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+        
+        // Create a mesh to use as a Drawing surface
+        this._drawingPlane  = Mesh.CreatePlane("Drawing Plane", 5, scene, true, Mesh.DOUBLESIDE);
+        this._drawingPlane.material = greyMat;
     }
 
     /**
@@ -79,7 +93,7 @@ export class InkCanvas {
     /**
      * Starts creating a new path at the location of the pointer
      */
-    public startPath(): void {
+    public startPath(): Boolean {
         if (this._currentPath) {
             return;
         }
@@ -87,27 +101,46 @@ export class InkCanvas {
         // Cleanup the redo list
         this._redoPaths.length = 0;
 
-        // Create the new path mesh and assigns its material
-        this._currentPath = this._createPath(this._scene.pointerX, this._scene.pointerY);
-        this._currentPath.material = this._createPathMaterial();
+        const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
+        if (pickInfo.hit) {
+            // Create the new path mesh and assigns its material
+            // Convert picked point into plane space point by multiplying with the plane world matrix 
+            // TODO
+            const worldMatrix = this._drawingPlane.getWorldMatrix();
+            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, worldMatrix);
 
-        // Quick Optim
-        this._currentPath.isPickable = false;
-        this._currentPath.material.freeze();
-        this._currentPath.alwaysSelectAsActiveMesh = true;
-        this._currentPath.freezeWorldMatrix();
+            this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
+            this._currentPath.material = this._createPathMaterial();
+
+            this._currentPath.parent = this._drawingPlane;
+            this._currentPath.renderingGroupId = 2;
+            // Quick Optim
+            this._currentPath.isPickable = false;
+            this._currentPath.material.freeze();
+            this._currentPath.alwaysSelectAsActiveMesh = true;
+            this._currentPath.freezeWorldMatrix();
+            return true;
+        } 
+        return false;
     }
 
     /**
      * Extends the path to the new pointer location
      */
-    public extendPath(): void {
+    public extendPath(): Boolean {
         if (!this._currentPath) {
             return;
         }
 
-        // Add a new point to the path
-        this._currentPath.addPointToPath(this._scene.pointerX, this._scene.pointerY);
+        const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
+        if (pickInfo.hit) {
+            // Add a new point to the path
+            const worldMatrix = this._drawingPlane.getWorldMatrix();
+            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, worldMatrix);
+            this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -163,7 +196,7 @@ export class InkCanvas {
      * Change the size of the current brush
      */
     public changeSize(size: number): void {
-        this._currentSize = size;
+        this._currentSize = size / 100;
     }
 
     /**
@@ -245,15 +278,18 @@ export class InkCanvas {
 
         if (this._debug) {
             const pathMaterial = createDebugMaterial("debugMaterial", this._scene);
+            pathMaterial.backFaceCulling = false;
             return pathMaterial;
         }
     
         if (this._currentMode === Brush.pen) {
             const pathMaterial = createSimpleMaterial("pathMaterial", this._scene, this._currentColor);
+            pathMaterial.backFaceCulling = false;
             return pathMaterial;
         }
     
         const pathMaterial = createRainbowMaterial("pathMaterial", this._scene);
+        pathMaterial.backFaceCulling = false;
         return pathMaterial;
     }
 

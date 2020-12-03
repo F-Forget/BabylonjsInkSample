@@ -154,7 +154,7 @@ export class PathBufferData {
 
         // Compute default slice rotation angle according to the roundness.
         this._roundness = Math.max(4, this._options.roundness);
-        this._radius = Math.max(1, this._options.radius);
+        this._radius = this._options.radius;
         this._roundnessSliceAlpha = 2 * Math.PI / this._roundness;
 
         // We can at max add as many vertices than half the roundness
