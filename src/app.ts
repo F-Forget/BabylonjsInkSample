@@ -1,6 +1,15 @@
-import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { Scene } from "@babylonjs/core/scene";
+import { Camera } from "@babylonjs/core/Cameras/camera";
+import { Color4, Color3 } from "@babylonjs/core/Maths/math.color";
+import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+
+
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
+
+import { createSimpleMaterial } from "./materials/simpleMaterial";
 
 import { InkCanvas } from "./inkCanvas";
 
@@ -15,7 +24,6 @@ const size5Btn = document.getElementById("size5") as HTMLElement;
 const size15Btn = document.getElementById("size15") as HTMLElement;
 const blackBtn = document.getElementById("black") as HTMLElement;
 const whiteBtn = document.getElementById("white") as HTMLElement;
-const rainbowBtn = document.getElementById("rainbow") as HTMLElement;
 
 /**
  * Can be set to enter in debug mode.
@@ -23,8 +31,70 @@ const rainbowBtn = document.getElementById("rainbow") as HTMLElement;
  */
 const debug = false;
 
+
+function createEngine() {
+    // Create our engine to hold on the canvas
+    const engine = new Engine(mainCanvas, true, { 
+        preserveDrawingBuffer: false,
+        alpha: false,
+    });
+    engine.preventCacheWipeBetweenFrames = true;
+    return engine;
+}
+
+function createScene(engine) {
+    // Create a scene to ink with
+    const scene = new Scene(engine);
+
+    // no need to clear here as we do not preserve buffers
+    scene.autoClearDepthAndStencil = false;
+
+    // Ensures default is part of our supported use cases.
+    scene.defaultMaterial = createSimpleMaterial("default", scene, Color3.White());
+
+    // A nice and fancy background color
+    const clearColor = new Color4(77 / 255, 86 / 255, 92 / 255, 1);
+    scene.clearColor = clearColor;
+
+    // Add a camera to the scene
+    const camera = new FreeCamera("orthoCamera", new Vector3(0, 0, -3), scene);
+
+    setupCamera(camera, engine.getRenderWidth(), engine.getRenderHeight());
+
+    // Rely on the underlying engine render loop to update the filter result every frame.
+    engine.runRenderLoop(() => {
+        scene.render();
+    });
+
+    // OnResize
+    engine.onResizeObservable.add(() => {
+        setupCamera(camera, engine.getRenderWidth(), engine.getRenderHeight());
+    });
+
+    return scene;
+}
+
+function setupCamera(camera: Camera, width: number, height: number): void {
+    // We chose an orthographic view to simplify at most our mesh creation
+    camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
+
+    // Setup the camera to fit with our gl coordinates in the canvas
+    camera.unfreezeProjectionMatrix();
+    camera.orthoTop = 0;
+    camera.orthoLeft = 0;
+    camera.orthoBottom = height;
+    camera.orthoRight = width;
+    camera.getProjectionMatrix(true);
+    camera.freezeProjectionMatrix();
+}
+
+const engine = createEngine();
+const scene = createScene(engine);
+
+
 // Create our inking surface
-const inkCanvas = new InkCanvas(mainCanvas, "./assets/particle.png", debug);
+const inkCanvas = new InkCanvas(scene, debug);
+
 
 // Timer Events
 setInterval(() => {
@@ -95,7 +165,4 @@ blackBtn.onclick = () => {
 };
 whiteBtn.onclick = () => {
     inkCanvas.changeColor(Color3.White());
-};
-rainbowBtn.onclick = () => {
-    inkCanvas.useRainbow();
 };

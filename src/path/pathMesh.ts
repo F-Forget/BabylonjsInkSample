@@ -147,18 +147,18 @@ export class PathMesh extends Mesh {
                 // Add 3 to handle the end data point
                 const length = this._currentChanges.indexEnd - this._currentChanges.indexStart + 3;
                 const offset = this._currentChanges.indexStart;
-                this._engine.indexBufferSubData(this._indicesBuffer, offset * 4, indices, offset, length);
+                this._engine.updateDynamicIndexBuffer(this._indicesBuffer, indices)
             }
             if (this._currentChanges.vertexPositionStart !== Number.MAX_VALUE) {
                 // Add 3 to handle the end data point
                 const positionsLength = this._currentChanges.vertexPositionEnd - this._currentChanges.vertexPositionStart + 3;
                 const positionsOffset = this._currentChanges.vertexPositionStart;
-                this._engine.vertexBufferSubData(this._positionsBuffer, positionsOffset * 4, positions, positionsOffset, positionsLength);
+                this._engine.updateDynamicVertexBuffer(this._positionsBuffer, positions);
 
                 // Add 1 to handle the end data point
                 const distancesLength = this._currentChanges.vertexDistanceEnd - this._currentChanges.vertexDistanceStart + 1;
                 const distancesOffset = this._currentChanges.vertexDistanceStart;
-                this._engine.vertexBufferSubData(this._distancesBuffer, distancesOffset * 4, distances, distancesOffset, distancesLength);
+                this._engine.updateDynamicVertexBuffer(this._distancesBuffer, distances);
             }
         }
 

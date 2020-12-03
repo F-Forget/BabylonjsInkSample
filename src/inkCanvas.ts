@@ -1,15 +1,11 @@
-import { Engine } from "@babylonjs/core/Engines/engine";
-import { Scene } from "@babylonjs/core/scene";
 import { Color4, Color3 } from "@babylonjs/core/Maths/math.color";
-import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { Camera } from "@babylonjs/core/Cameras/camera";
 import { Material } from "@babylonjs/core/Materials/material";
 import { PointerInfo } from "@babylonjs/core/Events/pointerEvents";
 import { Nullable } from "@babylonjs/core/types";
 import { KeyboardInfo } from "@babylonjs/core/Events/keyboardEvents";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
-import { Texture } from "@babylonjs/core/Materials/Textures";
 import { Observable } from "@babylonjs/core/Misc/observable";
 
 import { PathBufferDataOptions } from "./path/pathBufferData";
@@ -27,10 +23,6 @@ const enum Brush {
      * Normal pen mode
      */
     pen,
-    /**
-     * Rainbow mode
-     */
-    rainbow,
 }
 
 /**
@@ -39,10 +31,8 @@ const enum Brush {
  */
 export class InkCanvas {
     private readonly _debug: boolean;
-    private readonly _particleTextureURL: string;
     private readonly _scene: Scene;
     private readonly _pointerNode: Vector3;
-    private readonly _particleSystem: ParticleSystem;
 
     private readonly _paths: PathMesh[];
     private readonly _redoPaths: PathMesh[];
@@ -58,19 +48,18 @@ export class InkCanvas {
      * @param particleTextureURL defines the URL of the texture used for the rainbow particle effects
      * @param debug defines wheter the ink canvas is in debug mode or not (wireframe, input debounced...)
      */
-    constructor(canvas: HTMLCanvasElement, particleTextureURL: string, debug = false) {
+    constructor(scene: Scene, debug = false) {
         this._debug = debug;
-        this._particleTextureURL = particleTextureURL;
         this._paths = [];
         this._redoPaths = [];
         this._currentPath = null;
         this._currentSize = 5;
         this._currentColor = Color3.White();
-        this._currentMode = Brush.rainbow;
+        this._currentMode = Brush.pen;
 
-        this._scene = this._createScene(canvas);
+
+        this._scene = scene;
         this._pointerNode = new Vector3(0, 0, 0);
-        this._particleSystem = this._createParticleSystem();
     }
 
     /**
@@ -107,12 +96,6 @@ export class InkCanvas {
         this._currentPath.material.freeze();
         this._currentPath.alwaysSelectAsActiveMesh = true;
         this._currentPath.freezeWorldMatrix();
-
-        // Starts the particles in rainbow mode
-        if (this._currentMode === Brush.rainbow) {
-            this._updateParticleSystem();
-            this._particleSystem.start();
-        }
     }
 
     /**
@@ -125,11 +108,6 @@ export class InkCanvas {
 
         // Add a new point to the path
         this._currentPath.addPointToPath(this._scene.pointerX, this._scene.pointerY);
-
-        // Updates the particles in rainbow mode
-        if (this._currentMode === Brush.rainbow) {
-            this._updateParticleSystem();
-        }
     }
 
     /**
@@ -145,9 +123,6 @@ export class InkCanvas {
 
         // Clear the current path
         this._currentPath = null;
-
-        // Stops the particle system
-        this._particleSystem.stop();
     }
 
     /**
@@ -189,7 +164,6 @@ export class InkCanvas {
      */
     public changeSize(size: number): void {
         this._currentSize = size;
-        this._particleSystem.createSphereEmitter(this._currentSize, 0.5);
     }
 
     /**
@@ -205,13 +179,6 @@ export class InkCanvas {
      */
     public usePen(): void {
         this._currentMode = Brush.pen;
-    }
-
-    /**
-     * Switch to rainbow mode
-     */
-    public useRainbow(): void {
-        this._currentMode = Brush.rainbow;
     }
 
     /**
@@ -236,71 +203,11 @@ export class InkCanvas {
         // Update the current particle emitter
         this._pointerNode.x = this._scene.pointerX;
         this._pointerNode.y = this._scene.pointerY;
-
-        // Gets the interpolated color for the rainbow particle
-        getColorAtToRef(this._currentPath.totalLength, this._particleSystem.color2)
-        getColorAtToRef(this._currentPath.totalLength, this._particleSystem.color1)
-
-    }
-
-    private _createScene(canvas: HTMLCanvasElement): Scene {
-        // Create our engine to hold on the canvas
-        const engine = new Engine(canvas, true, { 
-            preserveDrawingBuffer: false,
-            alpha: false,
-        });
-        engine.preventCacheWipeBetweenFrames = true;
-    
-        // Create a scene to ink with
-        const scene = new Scene(engine);
-        
-        // no need to clear here as we do not preserve buffers
-        scene.autoClearDepthAndStencil = false;
-    
-        // Ensures default is part of our supported use cases.
-        scene.defaultMaterial = createSimpleMaterial("default", scene, Color3.White());
-
-        // A nice and fancy background color
-        const clearColor = new Color4(77 / 255, 86 / 255, 92 / 255, 1);
-        scene.clearColor = clearColor;
-    
-        // Add a camera to the scene
-        const camera = new FreeCamera("orthoCamera", new Vector3(0, 0, -3), scene);
-        this._setupCamera(camera, engine.getRenderWidth(), engine.getRenderHeight());
-    
-        // Rely on the underlying engine render loop to update the filter result every frame.
-        engine.runRenderLoop(() => {
-            scene.render();
-        });
-    
-        // OnResize
-        engine.onResizeObservable.add(() => {
-            this._setupCamera(camera, engine.getRenderWidth(), engine.getRenderHeight());
-        });
-    
-        return scene;
-    }
-
-    private _setupCamera(camera: Camera, width: number, height: number): void {
-        // We chose an orthographic view to simplify at most our mesh creation
-        camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
-
-        // Setup the camera to fit with our gl coordinates in the canvas
-        camera.unfreezeProjectionMatrix();
-        camera.orthoTop = 0;
-        camera.orthoLeft = 0;
-        camera.orthoBottom = height;
-        camera.orthoRight = width;
-        camera.getProjectionMatrix(true);
-        camera.freezeProjectionMatrix();
     }
 
     private _createParticleSystem(): ParticleSystem {
         // Create a particle system
         const particleSystem = new ParticleSystem("particles", 1500, this._scene);
-
-        // Texture of each particle
-        particleSystem.particleTexture = new Texture(this._particleTextureURL, this._scene);
 
         // Where the particles come from
         particleSystem.emitter = this._pointerNode; // the starting location
