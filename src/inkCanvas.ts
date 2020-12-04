@@ -15,7 +15,7 @@ import { createDebugMaterial } from "./materials/debugMaterial";
 import { createSimpleMaterial } from "./materials/simpleMaterial";
 import { createRainbowMaterial, getColorAtToRef } from "./materials/rainbowMaterial";
 
-import { Mesh, StandardMaterial } from "@babylonjs/core";
+import { AbstractMesh, Mesh, StandardMaterial } from "@babylonjs/core";
 import { MaterialTreeItemComponent } from "@babylonjs/inspector/components/sceneExplorer/entities/materialTreeItemComponent";
 
 /**
@@ -44,7 +44,7 @@ export class InkCanvas {
     private _currentSize: number;
     private _currentColor: Color3;
     private _currentMode: Brush;
-    private _currentDrawingPlane: Mesh;
+    private _currentDrawingPlane: AbstractMesh;
     private _invertedWorldMatrix: Matrix;
 
     /**
@@ -62,6 +62,7 @@ export class InkCanvas {
         this._currentColor = Color3.White();
         this._currentMode = Brush.pen;
         this._invertedWorldMatrix = new Matrix();
+        this._currentDrawingPlane = new AbstractMesh("Default Drawing Mesh");
 
         this._scene = scene;
         this._pointerNode = new Vector3(0, 0, 0);
@@ -71,10 +72,20 @@ export class InkCanvas {
         greyMat.diffuseColor = new Color3(77 / 255, 86 / 255, 92 / 255);
         greyMat.emissiveColor = new Color3(77 / 255, 86 / 255, 92 / 255);
         greyMat.specularColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+
+        const lightGreyMat = new StandardMaterial("white", scene);
+        lightGreyMat.diffuseColor = new Color3(155 / 255, 155 / 255, 155 / 255);
+        lightGreyMat.emissiveColor = new Color3(155 / 255, 155 / 255, 155 / 255);
+        lightGreyMat.specularColor = new Color3(155 / 255, 155 / 255, 155 / 255);
         
         // Create a mesh to use as a Drawing surface
-        this._currentDrawingPlane  = Mesh.CreatePlane("Drawing Plane", 5, scene, true, Mesh.DOUBLESIDE);
-        this._currentDrawingPlane.material = greyMat;
+        const drawingPlane1 = Mesh.CreatePlane("Drawing Plane 1", 5, scene, true, Mesh.DOUBLESIDE);
+        drawingPlane1.material = greyMat;
+        drawingPlane1.position = new Vector3(-5, 0, 0);
+
+        const drawingPlane2 = Mesh.CreatePlane("Drawing Plane 2", 5, scene, true, Mesh.DOUBLESIDE);
+        drawingPlane2.material = lightGreyMat;
+        drawingPlane1.position = new Vector3(5, 0, 0);
     }
 
     /**
@@ -102,32 +113,11 @@ export class InkCanvas {
         // Cleanup the redo list
         this._redoPaths.length = 0;
 
-        // Not Working
-        // const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY, (currentDrawingPlane) => {
-        //     if (pickInfo?.hit) {
-        //         console.log("Hit with " + pickInfo.pickedMesh.name);
-        //         // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-        //         currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
-        //         const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
-    
-        //         // Create the new path mesh and assigns its material
-        //         this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
-        //         this._currentPath.material = this._createPathMaterial();
-    
-        //         this._currentPath.parent = currentDrawingPlane;
-        //         this._currentPath.renderingGroupId = 2;
-        //         // Quick Optim
-        //         this._currentPath.isPickable = false;
-        //         this._currentPath.material.freeze();
-        //         this._currentPath.alwaysSelectAsActiveMesh = true;
-        //         this._currentPath.freezeWorldMatrix();
-        //         return true;
-        //     } 
-        // });
-
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo?.hit) {
-            console.log("Hit with " + pickInfo.pickedMesh.name);
+            if (this._currentDrawingPlane != pickInfo.pickedMesh) {
+                this._currentDrawingPlane = pickInfo.pickedMesh;
+            }
             // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
             this._currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
             const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
@@ -156,29 +146,22 @@ export class InkCanvas {
             return;
         }
 
-        // Not working 
-        // const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY, (currentDrawingPlane) => {
-        //     if (pickInfo.hit) {
-        //         // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-        //         currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
-        //         const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
-                
-        //         // Add a new point to the path
-        //         this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
-        //         return true;
-        //     }
-        // });
-
-        // Working 
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
-        if (pickInfo.hit) {
-            // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-            this._currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
-            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
-            
-            // Add a new point to the path
-            this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
-            return true;
+        if (pickInfo?.hit) {
+            if (this._currentDrawingPlane != pickInfo.pickedMesh) {
+                this.endPath();
+                this.startPath();
+                return true;
+            }
+            else {
+                // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
+                pickInfo.pickedMesh.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+                const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
+                
+                // Add a new point to the path
+                this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
+                return true;
+            }
         }
 
         return false;
