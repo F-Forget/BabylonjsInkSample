@@ -1,6 +1,6 @@
 import { Color4, Color3 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Material } from "@babylonjs/core/Materials/material";
 import { PointerInfo } from "@babylonjs/core/Events/pointerEvents";
 import { Nullable } from "@babylonjs/core/types";
@@ -16,6 +16,7 @@ import { createSimpleMaterial } from "./materials/simpleMaterial";
 import { createRainbowMaterial, getColorAtToRef } from "./materials/rainbowMaterial";
 
 import { Mesh, StandardMaterial } from "@babylonjs/core";
+import { MaterialTreeItemComponent } from "@babylonjs/inspector/components/sceneExplorer/entities/materialTreeItemComponent";
 
 /**
  * Various brush modes
@@ -44,6 +45,7 @@ export class InkCanvas {
     private _currentColor: Color3;
     private _currentMode: Brush;
     private _drawingPlane: Mesh;
+    private _invertedWorldMatrix: Matrix;
 
     /**
      * Creates an instance of an ink canvas associated to a html canvas element
@@ -59,8 +61,7 @@ export class InkCanvas {
         this._currentSize = 0.05;
         this._currentColor = Color3.White();
         this._currentMode = Brush.pen;
-
-
+        this._invertedWorldMatrix = new Matrix();
 
         this._scene = scene;
         this._pointerNode = new Vector3(0, 0, 0);
@@ -103,12 +104,11 @@ export class InkCanvas {
 
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo.hit) {
-            // Create the new path mesh and assigns its material
-            // Convert picked point into plane space point by multiplying with the plane world matrix 
-            // TODO
-            const worldMatrix = this._drawingPlane.getWorldMatrix();
-            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, worldMatrix);
+            // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
+            this._drawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
 
+            // Create the new path mesh and assigns its material
             this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
             this._currentPath.material = this._createPathMaterial();
 
@@ -134,9 +134,11 @@ export class InkCanvas {
 
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo.hit) {
+            // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
+            this._drawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
+            
             // Add a new point to the path
-            const worldMatrix = this._drawingPlane.getWorldMatrix();
-            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, worldMatrix);
             this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
             return true;
         }
