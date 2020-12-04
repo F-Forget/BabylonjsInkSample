@@ -44,7 +44,7 @@ export class InkCanvas {
     private _currentSize: number;
     private _currentColor: Color3;
     private _currentMode: Brush;
-    private _drawingPlane: Mesh;
+    private _currentDrawingPlane: Mesh;
     private _invertedWorldMatrix: Matrix;
 
     /**
@@ -73,8 +73,8 @@ export class InkCanvas {
         greyMat.specularColor = new Color3(77 / 255, 86 / 255, 92 / 255);
         
         // Create a mesh to use as a Drawing surface
-        this._drawingPlane  = Mesh.CreatePlane("Drawing Plane", 5, scene, true, Mesh.DOUBLESIDE);
-        this._drawingPlane.material = greyMat;
+        this._currentDrawingPlane  = Mesh.CreatePlane("Drawing Plane", 5, scene, true, Mesh.DOUBLESIDE);
+        this._currentDrawingPlane.material = greyMat;
     }
 
     /**
@@ -102,17 +102,41 @@ export class InkCanvas {
         // Cleanup the redo list
         this._redoPaths.length = 0;
 
+        // Not Working
+        // const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY, (currentDrawingPlane) => {
+        //     if (pickInfo?.hit) {
+        //         console.log("Hit with " + pickInfo.pickedMesh.name);
+        //         // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
+        //         currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+        //         const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
+    
+        //         // Create the new path mesh and assigns its material
+        //         this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
+        //         this._currentPath.material = this._createPathMaterial();
+    
+        //         this._currentPath.parent = currentDrawingPlane;
+        //         this._currentPath.renderingGroupId = 2;
+        //         // Quick Optim
+        //         this._currentPath.isPickable = false;
+        //         this._currentPath.material.freeze();
+        //         this._currentPath.alwaysSelectAsActiveMesh = true;
+        //         this._currentPath.freezeWorldMatrix();
+        //         return true;
+        //     } 
+        // });
+
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
-        if (pickInfo.hit) {
+        if (pickInfo?.hit) {
+            console.log("Hit with " + pickInfo.pickedMesh.name);
             // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-            this._drawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+            this._currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
             const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
 
             // Create the new path mesh and assigns its material
             this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
             this._currentPath.material = this._createPathMaterial();
 
-            this._currentPath.parent = this._drawingPlane;
+            this._currentPath.parent = this._currentDrawingPlane;
             this._currentPath.renderingGroupId = 2;
             // Quick Optim
             this._currentPath.isPickable = false;
@@ -132,16 +156,31 @@ export class InkCanvas {
             return;
         }
 
+        // Not working 
+        // const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY, (currentDrawingPlane) => {
+        //     if (pickInfo.hit) {
+        //         // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
+        //         currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+        //         const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
+                
+        //         // Add a new point to the path
+        //         this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
+        //         return true;
+        //     }
+        // });
+
+        // Working 
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo.hit) {
             // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-            this._drawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+            this._currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
             const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
             
             // Add a new point to the path
             this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
             return true;
         }
+
         return false;
     }
 
