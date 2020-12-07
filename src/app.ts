@@ -55,7 +55,7 @@ function createScene(engine) {
 
     // Add a camera to the scene
     const camera = new FreeCamera("orthoCamera", new Vector3(0, 0, -6), scene);
-    camera.position = new Vector3(3, 0, -10);
+    camera.position = new Vector3(0, 0, -10);
 
     // Rely on the underlying engine render loop to update the filter result every frame.
     engine.runRenderLoop(() => {

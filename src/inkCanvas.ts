@@ -81,11 +81,13 @@ export class InkCanvas {
         // Create a mesh to use as a Drawing surface
         const drawingPlane1 = Mesh.CreatePlane("Drawing Plane 1", 5, scene, true, Mesh.DOUBLESIDE);
         drawingPlane1.material = greyMat;
-        drawingPlane1.position = new Vector3(-5, 0, 0);
+        drawingPlane1.position = new Vector3(-1.7, 0, 0);
+        drawingPlane1.rotation = new Vector3(0, -Math.PI / 4, 0);
 
         const drawingPlane2 = Mesh.CreatePlane("Drawing Plane 2", 5, scene, true, Mesh.DOUBLESIDE);
         drawingPlane2.material = lightGreyMat;
-        drawingPlane1.position = new Vector3(5, 0, 0);
+        drawingPlane2.position = new Vector3(1.7, 0, 0);
+        drawingPlane2.rotation = new Vector3(0, Math.PI / 4, 0);
     }
 
     /**
