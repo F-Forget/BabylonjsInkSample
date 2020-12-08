@@ -15,7 +15,7 @@ import { createDebugMaterial } from "./materials/debugMaterial";
 import { createSimpleMaterial } from "./materials/simpleMaterial";
 import { createRainbowMaterial, getColorAtToRef } from "./materials/rainbowMaterial";
 
-import { AbstractMesh, Mesh, StandardMaterial } from "@babylonjs/core";
+import { AbstractMesh, Mesh, MeshBuilder, Plane, StandardMaterial } from "@babylonjs/core";
 import { MaterialTreeItemComponent } from "@babylonjs/inspector/components/sceneExplorer/entities/materialTreeItemComponent";
 
 /**
@@ -45,6 +45,7 @@ export class InkCanvas {
     private _currentColor: Color3;
     private _currentMode: Brush;
     private _currentDrawingPlane: AbstractMesh;
+    private _lastCoordinates: Vector3;
     private _invertedWorldMatrix: Matrix;
 
     /**
@@ -123,6 +124,7 @@ export class InkCanvas {
             // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
             this._currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
             const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
+            console.log("X:" + localCoordinates.x, "Y:" + localCoordinates.y, "Z:" + localCoordinates.z);
 
             // Create the new path mesh and assigns its material
             this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
@@ -150,18 +152,56 @@ export class InkCanvas {
 
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo?.hit) {
+            // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
+            pickInfo.pickedMesh.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
             if (this._currentDrawingPlane != pickInfo.pickedMesh) {
+                // Handles when the drawing occurs on another plane
+
+                // 1. Get the vector from the last point on the first plane
+                // and the first point on the second plane projected on the first one (AB)
+
+                // Project the first point (made on the pickedMesh plane) on the previous drawing plane (currentDrawingPlane)
+                const previousDrawingPlane = this._currentDrawingPlane;
+
+                //Ensure working with new values for flat surface by computing and obtaining its worldMatrix
+                previousDrawingPlane.computeWorldMatrix(true);
+                const previousDrawingPlane_worldMatrix = previousDrawingPlane.getWorldMatrix();
+
+                //Obtain normals for plane and assign one of them as the normal
+                const previousDrawingPlane_vertexData = previousDrawingPlane.getVerticesData("normal");
+                var previousDrawingPlaneNormal = new Vector3(previousDrawingPlane_vertexData[0], previousDrawingPlane_vertexData[1], previousDrawingPlane_vertexData[2]);
+                //Use worldMatrix to transform normal into its current world value
+                previousDrawingPlaneNormal = Vector3.TransformNormal(previousDrawingPlaneNormal, previousDrawingPlane_worldMatrix)
+
+                const previousDrawingPlaneSource = Plane.FromPositionAndNormal(previousDrawingPlane.position, previousDrawingPlaneNormal);
+
+                // TODO: How does the projectOnPlane works ?
+                const projectedPoint = localCoordinates.projectOnPlane(previousDrawingPlaneSource, this._scene.activeCamera.position);
+                //console.log("X:" + projectedPoint.x, "Y:" + projectedPoint.y, "Z:" + projectedPoint.z);
+
+                const B = projectedPoint;
+                const A = this._lastCoordinates;
+
+                console.log("Ax: " + A.x + " Ay: " + A.y + " Az: " + A.z)
+                console.log("Bx: " + B.x + " By: " + B.y + " Bz: " + B.z)
+
+                const AB = B.subtract(A);
+                console.log("ABx:" + AB.x, " ABy:" + AB.y, " ABz:" + AB.z);
+
+                // 2. Get the intersection of the 2 planes (IJ)
+
+                // 3. Get the intersection between the AB and IJ 
+
+                this._lastCoordinates = localCoordinates;
                 this.endPath();
                 this.startPath();
                 return true;
             }
             else {
-                // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-                pickInfo.pickedMesh.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
-                const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
-                
                 // Add a new point to the path
                 this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
+                this._lastCoordinates = localCoordinates;
                 return true;
             }
         }
