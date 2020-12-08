@@ -1,11 +1,10 @@
-import { Color4, Color3 } from "@babylonjs/core/Maths/math.color";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Material } from "@babylonjs/core/Materials/material";
 import { PointerInfo } from "@babylonjs/core/Events/pointerEvents";
 import { Nullable } from "@babylonjs/core/types";
 import { KeyboardInfo } from "@babylonjs/core/Events/keyboardEvents";
-import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Observable } from "@babylonjs/core/Misc/observable";
 
 import { PathBufferDataOptions } from "./path/pathBufferData";
@@ -13,10 +12,9 @@ import { PathMesh } from "./path/pathMesh";
 
 import { createDebugMaterial } from "./materials/debugMaterial";
 import { createSimpleMaterial } from "./materials/simpleMaterial";
-import { createRainbowMaterial, getColorAtToRef } from "./materials/rainbowMaterial";
+import { createRainbowMaterial } from "./materials/rainbowMaterial";
 
-import { AbstractMesh, Mesh, StandardMaterial } from "@babylonjs/core";
-import { MaterialTreeItemComponent } from "@babylonjs/inspector/components/sceneExplorer/entities/materialTreeItemComponent";
+import { Mesh, StandardMaterial } from "@babylonjs/core";
 
 /**
  * Various brush modes
@@ -35,7 +33,6 @@ const enum Brush {
 export class InkCanvas {
     private readonly _debug: boolean;
     private readonly _scene: Scene;
-    private readonly _pointerNode: Vector3;
 
     private readonly _paths: PathMesh[];
     private readonly _redoPaths: PathMesh[];
@@ -44,7 +41,6 @@ export class InkCanvas {
     private _currentSize: number;
     private _currentColor: Color3;
     private _currentMode: Brush;
-    private _currentDrawingPlane: AbstractMesh;
     private _invertedWorldMatrix: Matrix;
 
     /**
@@ -62,32 +58,20 @@ export class InkCanvas {
         this._currentColor = Color3.White();
         this._currentMode = Brush.pen;
         this._invertedWorldMatrix = new Matrix();
-        this._currentDrawingPlane = new AbstractMesh("Default Drawing Mesh");
 
         this._scene = scene;
-        this._pointerNode = new Vector3(0, 0, 0);
 
         //Materials
-        const greyMat = new StandardMaterial("white", scene);
+        const greyMat = new StandardMaterial("grey", scene);
         greyMat.diffuseColor = new Color3(77 / 255, 86 / 255, 92 / 255);
         greyMat.emissiveColor = new Color3(77 / 255, 86 / 255, 92 / 255);
         greyMat.specularColor = new Color3(77 / 255, 86 / 255, 92 / 255);
-
-        const lightGreyMat = new StandardMaterial("white", scene);
-        lightGreyMat.diffuseColor = new Color3(155 / 255, 155 / 255, 155 / 255);
-        lightGreyMat.emissiveColor = new Color3(155 / 255, 155 / 255, 155 / 255);
-        lightGreyMat.specularColor = new Color3(155 / 255, 155 / 255, 155 / 255);
         
         // Create a mesh to use as a Drawing surface
-        const drawingPlane1 = Mesh.CreatePlane("Drawing Plane 1", 5, scene, true, Mesh.DOUBLESIDE);
-        drawingPlane1.material = greyMat;
-        drawingPlane1.position = new Vector3(-1.7, 0, 0);
-        drawingPlane1.rotation = new Vector3(0, -Math.PI / 4, 0);
-
-        const drawingPlane2 = Mesh.CreatePlane("Drawing Plane 2", 5, scene, true, Mesh.DOUBLESIDE);
-        drawingPlane2.material = lightGreyMat;
-        drawingPlane2.position = new Vector3(1.7, 0, 0);
-        drawingPlane2.rotation = new Vector3(0, Math.PI / 4, 0);
+        const drawingPlane = Mesh.CreatePlane("Drawing Plane 1", 5, scene, true, Mesh.DOUBLESIDE);
+        drawingPlane.material = greyMat;
+        drawingPlane.position = new Vector3(0, 0, 0);
+        drawingPlane.rotation = new Vector3(Math.PI / 16, 0, 0);
     }
 
     /**
@@ -117,19 +101,17 @@ export class InkCanvas {
 
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo?.hit) {
-            if (this._currentDrawingPlane != pickInfo.pickedMesh) {
-                this._currentDrawingPlane = pickInfo.pickedMesh;
-            }
             // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-            this._currentDrawingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+            pickInfo.pickedMesh.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
             const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
 
             // Create the new path mesh and assigns its material
             this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
             this._currentPath.material = this._createPathMaterial();
 
-            this._currentPath.parent = this._currentDrawingPlane;
+            this._currentPath.parent = pickInfo.pickedMesh;
             this._currentPath.renderingGroupId = 2;
+
             // Quick Optim
             this._currentPath.isPickable = false;
             this._currentPath.material.freeze();
@@ -150,22 +132,14 @@ export class InkCanvas {
 
         const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo?.hit) {
-            if (this._currentDrawingPlane != pickInfo.pickedMesh) {
-                this.endPath();
-                this.startPath();
-                return true;
-            }
-            else {
-                // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-                pickInfo.pickedMesh.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
-                const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
-                
-                // Add a new point to the path
-                this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
-                return true;
-            }
+            // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
+            pickInfo.pickedMesh.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
+            
+            // Add a new point to the path
+            this._currentPath.addPointToPath(localCoordinates.x, localCoordinates.y);
+            return true;
         }
-
         return false;
     }
 
@@ -256,46 +230,6 @@ export class InkCanvas {
         return import(/* webpackChunkName: "debug" */ "./debug/appDebug").then((debugModule) => {
             debugModule.toggleDebugMode(this._scene);
         });
-    }
-
-    private _updateParticleSystem(): void {
-        // Update the current particle emitter
-        this._pointerNode.x = this._scene.pointerX;
-        this._pointerNode.y = this._scene.pointerY;
-    }
-
-    private _createParticleSystem(): ParticleSystem {
-        // Create a particle system
-        const particleSystem = new ParticleSystem("particles", 1500, this._scene);
-
-        // Where the particles come from
-        particleSystem.emitter = this._pointerNode; // the starting location
-
-        // Colors of all particles
-        particleSystem.color1 = new Color4(0.99, 0.99, 0.99);
-        particleSystem.color2 = new Color4(1, 0.98, 0);
-        particleSystem.colorDead = new Color4(0.1, 0.1, 0.1, 0.1);
-    
-        // Size of each particle; random between...
-        particleSystem.minSize = 1;
-        particleSystem.maxSize = 8;
-    
-        // Life time of each particle; random between...
-        particleSystem.minLifeTime = 0.1;
-        particleSystem.maxLifeTime = 0.2;
-
-        // Emission rate
-        particleSystem.emitRate = 5000;
-
-        // Emission Space
-        particleSystem.createSphereEmitter(this._currentSize, 0.3);
-    
-        // Speed
-        particleSystem.minEmitPower = 70;
-        particleSystem.maxEmitPower = 100;
-        particleSystem.updateSpeed = 0.005;
-    
-        return particleSystem;
     }
 
     private _createPathMaterial(): Material {

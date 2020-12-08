@@ -1,10 +1,8 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
-import { Camera } from "@babylonjs/core/Cameras/camera";
-import { Color4, Color3 } from "@babylonjs/core/Maths/math.color";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-
 
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
@@ -12,7 +10,6 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { createSimpleMaterial } from "./materials/simpleMaterial";
 
 import { InkCanvas } from "./inkCanvas";
-import { Mesh, StandardMaterial } from "@babylonjs/core";
 
 // Find our elements
 const mainCanvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -31,7 +28,6 @@ const whiteBtn = document.getElementById("white") as HTMLElement;
  * Materials will be wireframed and inputs will be debounced
  */
 const debug = false;
-
 
 function createEngine() {
     // Create our engine to hold on the canvas
@@ -68,10 +64,8 @@ function createScene(engine) {
 const engine = createEngine();
 const scene = createScene(engine);
 
-
 // Create our inking surface
 const inkCanvas = new InkCanvas(scene, debug);
-
 
 // Timer Events
 setInterval(() => {
