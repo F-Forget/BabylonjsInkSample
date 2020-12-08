@@ -39,6 +39,7 @@ export class InkCanvas {
 
     private _currentPath: Nullable<PathMesh> = null;
     private _currentSize: number;
+    private _sizeScaleFactor: number = 0.01;
     private _currentColor: Color3;
     private _currentMode: Brush;
     private _invertedWorldMatrix: Matrix;
@@ -54,7 +55,7 @@ export class InkCanvas {
         this._paths = [];
         this._redoPaths = [];
         this._currentPath = null;
-        this._currentSize = 0.05;
+        this._currentSize = 5;
         this._currentColor = Color3.White();
         this._currentMode = Brush.pen;
         this._invertedWorldMatrix = new Matrix();
@@ -196,7 +197,7 @@ export class InkCanvas {
      * Change the size of the current brush
      */
     public changeSize(size: number): void {
-        this._currentSize = size / 100;
+        this._currentSize = size;
     }
 
     /**
@@ -257,7 +258,7 @@ export class InkCanvas {
         // Creates a path mesh according to our current inking setup
 
         let options: Partial<PathBufferDataOptions> = {
-            radius: this._currentSize
+            radius: this._currentSize * this._sizeScaleFactor
         }
     
         if (this._debug) {
