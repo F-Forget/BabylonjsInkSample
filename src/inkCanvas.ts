@@ -233,6 +233,13 @@ export class InkCanvas {
         });
     }
 
+    public getLastIndicesAndPositions() {
+        console.log("positions:");
+        console.log(JSON.stringify(this._paths[0].getLastPositions()));
+        console.log("indices:")
+        console.log(JSON.stringify(this._paths[0].getLastIndices()));
+    }
+
     private _createPathMaterial(): Material {
         // Creates a material for the path according to our current inking
         // setup.

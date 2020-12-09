@@ -27,6 +27,9 @@ export class PathMesh extends Mesh {
     private _positionsBuffer: DataBuffer;
     private _distancesBuffer: DataBuffer;
 
+    private _lastIndices = [];
+    private _lastPositions = [];
+
     /**
      * Instantiates a new path from its starting location.
      * @param name The value used by scene.getMeshByName() to do a lookup.
@@ -94,6 +97,14 @@ export class PathMesh extends Mesh {
         super.dispose(doNotRecurse, disposeMaterialAndTextures);
     }
 
+    public getLastIndices(): number[] {
+        return this._lastIndices;
+    }
+
+    public getLastPositions(): number[] {
+        return this._lastPositions;
+    }
+
     private _createGeometry(): void {
         const indices = this._pathData.indices;
         const positions = this._pathData.positions;
@@ -125,6 +136,25 @@ export class PathMesh extends Mesh {
         const indices = this._pathData.indices;
         const positions = this._pathData.positions;
         const distances = this._pathData.distances;
+
+        var usefullIndices = [];
+        for (let index = 0; index < indices.length; index++) {
+            if (indices[index] != 0)
+            {
+                usefullIndices.push(indices[index]);
+            }   
+        }
+
+        var usefullPositions = [];
+        for (let index = 0; index < positions.length; index++) {
+            if (positions[index] != 0)
+            {
+                usefullPositions.push(positions[index]);
+            }   
+        }
+
+        this._lastIndices = usefullIndices;
+        this._lastPositions = usefullPositions;
 
         const geometry = this.geometry;
 

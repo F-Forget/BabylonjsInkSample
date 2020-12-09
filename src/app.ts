@@ -22,6 +22,7 @@ const size5Btn = document.getElementById("size5") as HTMLElement;
 const size15Btn = document.getElementById("size15") as HTMLElement;
 const blackBtn = document.getElementById("black") as HTMLElement;
 const whiteBtn = document.getElementById("white") as HTMLElement;
+const updateBtn = document.getElementById("update") as HTMLElement;
 
 /**
  * Can be set to enter in debug mode.
@@ -137,3 +138,6 @@ blackBtn.onclick = () => {
 whiteBtn.onclick = () => {
     inkCanvas.changeColor(Color3.White());
 };
+updateBtn.onclick = () => {
+    inkCanvas.getLastIndicesAndPositions();
+}
