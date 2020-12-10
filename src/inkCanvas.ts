@@ -234,10 +234,8 @@ export class InkCanvas {
     }
 
     public getLastIndicesAndPositions() {
-        console.log("positions:");
-        console.log(JSON.stringify(this._paths[0].getLastPositions()));
-        console.log("indices:")
-        console.log(JSON.stringify(this._paths[0].getLastIndices()));
+        console.log("LOG:");
+        console.log(this._paths[0].geometry.serializeVerticeData());
     }
 
     private _createPathMaterial(): Material {
