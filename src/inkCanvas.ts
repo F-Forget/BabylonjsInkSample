@@ -14,7 +14,7 @@ import { createDebugMaterial } from "./materials/debugMaterial";
 import { createSimpleMaterial } from "./materials/simpleMaterial";
 import { createRainbowMaterial } from "./materials/rainbowMaterial";
 
-import { Mesh, StandardMaterial } from "@babylonjs/core";
+import { Mesh, StandardMaterial, MeshBuilder } from "@babylonjs/core";
 
 /**
  * Various brush modes
@@ -43,6 +43,7 @@ export class InkCanvas {
     private _currentColor: Color3;
     private _currentMode: Brush;
     private _invertedWorldMatrix: Matrix;
+    private _inkingPlaneMaterial: StandardMaterial;
 
     /**
      * Creates an instance of an ink canvas associated to a html canvas element
@@ -63,14 +64,15 @@ export class InkCanvas {
         this._scene = scene;
 
         //Materials
-        const greyMat = new StandardMaterial("grey", scene);
-        greyMat.diffuseColor = new Color3(77 / 255, 86 / 255, 92 / 255);
-        greyMat.emissiveColor = new Color3(77 / 255, 86 / 255, 92 / 255);
-        greyMat.specularColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+        this._inkingPlaneMaterial = new StandardMaterial("grey", scene);
+        this._inkingPlaneMaterial.diffuseColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+        this._inkingPlaneMaterial.emissiveColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+        this._inkingPlaneMaterial.specularColor = new Color3(77 / 255, 86 / 255, 92 / 255);
+        this._inkingPlaneMaterial.alpha = 0.3;
         
         // Create a mesh to use as a Drawing surface
         const drawingPlane = Mesh.CreatePlane("Drawing Plane 1", 5, scene, true, Mesh.DOUBLESIDE);
-        drawingPlane.material = greyMat;
+        drawingPlane.material = this._inkingPlaneMaterial;
         drawingPlane.position = new Vector3(0, 0, 0);
         drawingPlane.rotation = new Vector3(Math.PI / 16, 0, 0);
     }
@@ -100,25 +102,34 @@ export class InkCanvas {
         // Cleanup the redo list
         this._redoPaths.length = 0;
 
-        const pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
+        let pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY);
         if (pickInfo?.hit) {
-            // Convert pickedPoint (global) into plane space point (local) by multiplying with the inverted world matrix 
-            pickInfo.pickedMesh.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
-            const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
+            if (pickInfo.pickedPoint !== null) {
+                const planeNormal = (pickInfo.pickedPoint.subtract(this._scene.activeCamera.globalPosition)).normalize();
+                const inkingPlane = MeshBuilder.CreatePlane("Drawing Plane", {size: 5, sideOrientation: Mesh.DOUBLESIDE, updatable: false}, this._scene);
+                inkingPlane.material = this._inkingPlaneMaterial;
+                inkingPlane.position = pickInfo.pickedPoint;
+                inkingPlane.setDirection(planeNormal);
+                pickInfo.pickedMesh.isPickable = false;
+                inkingPlane.isPickable = true;
+                pickInfo = this._scene.pick(this._scene.pointerX, this._scene.pointerY, (inkingPlane) => true);
+                inkingPlane.getWorldMatrix().invertToRef(this._invertedWorldMatrix);
+                const localCoordinates = Vector3.TransformCoordinates(pickInfo.pickedPoint, this._invertedWorldMatrix);
 
-            // Create the new path mesh and assigns its material
-            this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
-            this._currentPath.material = this._createPathMaterial();
+                // Create the new path mesh and assigns its material
+                this._currentPath = this._createPath(localCoordinates.x, localCoordinates.y);
+                this._currentPath.material = this._createPathMaterial();
 
-            this._currentPath.parent = pickInfo.pickedMesh;
-            this._currentPath.renderingGroupId = 2;
+                this._currentPath.parent = inkingPlane;
+                this._currentPath.renderingGroupId = 2;
 
-            // Quick Optim
-            this._currentPath.isPickable = false;
-            this._currentPath.material.freeze();
-            this._currentPath.alwaysSelectAsActiveMesh = true;
-            this._currentPath.freezeWorldMatrix();
-            return true;
+                // Quick Optim
+                this._currentPath.isPickable = false;
+                this._currentPath.material.freeze();
+                this._currentPath.alwaysSelectAsActiveMesh = true;
+                this._currentPath.freezeWorldMatrix();
+                return true;
+            }
         } 
         return false;
     }
